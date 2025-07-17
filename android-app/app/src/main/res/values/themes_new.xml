@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light theme -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight">
+        <!-- Primary brand color -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryVariant</item>
+        <item name="colorAccent">@color/colorSecondary</item>
+        
+        <!-- Background colors -->
+        <item name="android:colorBackground">@color/colorBackground</item>
+        
+        <!-- Status bar color -->
+        <item name="android:statusBarColor">@color/colorPrimary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        
+        <!-- Navigation bar color -->
+        <item name="android:navigationBarColor">@color/colorSurface</item>
+        
+        <!-- Text colors -->
+        <item name="android:textColorPrimary">@color/colorOnSurface</item>
+        <item name="android:textColorSecondary">@color/colorOnSurface</item>
+    </style>
+
+    <!-- Chat Bubble Styles -->
+    <style name="UserMessageBubble">
+        <item name="android:background">@color/user_message_bg_light</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:layout_margin">8dp</item>
+        <item name="android:textColor">@android:color/black</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="AiMessageBubble">
+        <item name="android:background">@color/ai_message_bg_light</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:layout_margin">8dp</item>
+        <item name="android:textColor">@android:color/black</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <!-- Code Block Style -->
+    <style name="CodeBlock">
+        <item name="android:background">@color/code_bg_light</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@android:color/black</item>
+    </style>
+
+    <!-- Floating Action Button Style -->
+    <style name="FloatingActionButtonStyle">
+        <item name="backgroundTint">@color/colorSecondary</item>
+        <item name="tint">@color/colorOnSecondary</item>
+    </style>
+</resources>

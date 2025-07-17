@@ -1,0 +1,65 @@
+<resources>
+    <string name="app_name">AI 聊天多服務平台</string>
+    <string name="cd_app_logo">應用程式圖示</string>
+    
+    <!-- 登入頁面 -->
+    <string name="login_title">AI 聊天多服務平台</string>
+    <string name="login_subtitle">連接多個 AI 服務商的統一聊天平台</string>
+    <string name="username">用戶名</string>
+    <string name="password">密碼</string>
+    <string name="portal_url">Portal URL</string>
+    <string name="login">登入</string>
+    <string name="show_password">顯示密碼</string>
+    <string name="hide_password">隱藏密碼</string>
+    <string name="main_features">主要功能</string>
+    
+    <!-- 功能特性 -->
+    <string name="feature_ai_services">✓ 支援 30+ AI 服務商</string>
+    <string name="feature_multi_session">✓ 多會話管理</string>
+    <string name="feature_api_encryption">✓ API Key 加密儲存</string>
+    <string name="feature_local_storage">✓ 聊天記錄本地保存</string>
+    <string name="feature_import_export">✓ 資料匯入匯出</string>
+    <string name="feature_responsive">✓ 響應式設計</string>
+    
+    <!-- 聊天頁面 -->
+    <string name="chat_title">AI 聊天</string>
+    <string name="new_conversation">新對話</string>
+    <string name="conversation_list">對話列表</string>
+    <string name="no_conversations">還沒有對話\n點擊 + 創建新對話</string>
+    <string name="type_message">輸入訊息...</string>
+    <string name="send">發送</string>
+    <string name="ai_responding">AI 正在回應...</string>
+    <string name="welcome_message">歡迎使用 AI 聊天平台</string>
+    <string name="start_chat_hint">點擊左側創建新對話開始聊天</string>
+    
+    <!-- 導航和菜單 -->
+    <string name="menu">菜單</string>
+    <string name="more_options">更多</string>
+    <string name="settings">設置</string>
+    <string name="logout">登出</string>
+    <string name="delete_conversation">刪除對話</string>
+    
+    <!-- 錯誤訊息 -->
+    <string name="error_network">網路錯誤</string>
+    <string name="error_login_failed">登入失敗</string>
+    <string name="error_invalid_credentials">用戶名或密碼錯誤</string>
+    <string name="error_server_unavailable">伺服器無法連接</string>
+    <string name="error_create_session_failed">創建對話失敗</string>
+    <string name="error_send_message_failed">發送訊息失敗</string>
+    <string name="error_delete_session_failed">刪除對話失敗</string>
+    
+    <!-- 通用 -->
+    <string name="ok">確定</string>
+    <string name="cancel">取消</string>
+    <string name="retry">重試</string>
+    <string name="loading">載入中...</string>
+    <string name="save">保存</string>
+    <string name="edit">編輯</string>
+    <string name="delete">刪除</string>
+    <string name="confirm">確認</string>
+    
+    <!-- 單位和數據 -->
+    <string name="tokens_unit">tokens</string>
+    <string name="messages_count">%d 條訊息</string>
+    <string name="service_model_format">%1$s • %2$s</string>
+</resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AppCompat Theme Colors for Dark Mode -->
+    <color name="colorPrimary">#90CAF9</color>
+    <color name="colorPrimaryVariant">#1565C0</color>
+    <color name="colorOnPrimary">#003258</color>
+    <color name="colorSecondary">#64FFDA</color>
+    <color name="colorSecondaryVariant">#00BFA5</color>
+    <color name="colorOnSecondary">#00332C</color>
+    <color name="colorBackground">#1A1C1E</color>
+    <color name="colorOnBackground">#E2E2E6</color>
+    <color name="colorSurface">#1A1C1E</color>
+    <color name="colorOnSurface">#E2E2E6</color>
+    <color name="colorError">#FFB4AB</color>
+    <color name="colorOnError">#690005</color>
+</resources>

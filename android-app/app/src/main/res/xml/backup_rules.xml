@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude the shared preference file that contains our data -->
+    <exclude domain="sharedpref" path="ai_chat_secure_prefs" />
+    <exclude domain="database" path="ai_chat_database" />
+</full-backup-content>
