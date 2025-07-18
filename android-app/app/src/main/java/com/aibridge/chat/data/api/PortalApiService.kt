@@ -109,7 +109,10 @@ class PortalApiService @Inject constructor(
         sessionCookie: String? = null
     ): ChatResponse = withContext(Dispatchers.IO) {
         try {
-            val chatUrl = "${ApiConfig.BACKEND_BASE_URL}${ApiConfig.CHAT_ENDPOINT}?id=$portalId&action=completion"
+            // 使用動態發現的端點或回退到配置的端點
+            val baseChatUrl = ApiConfig.getPortalCompletionUrl()
+                ?: "${ApiConfig.BACKEND_BASE_URL}${ApiConfig.CHAT_ENDPOINT}"
+            val chatUrl = "$baseChatUrl?id=$portalId&action=completion"
             
             Log.d(TAG, "Portal API URL: $chatUrl")
             Log.d(TAG, "Portal ID: $portalId")

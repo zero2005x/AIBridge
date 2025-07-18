@@ -124,8 +124,8 @@ object NetworkModule {
     
     @Provides
     @Singleton
-    fun provideAuthApiService(okHttpClient: OkHttpClient, networkUtils: NetworkUtils): AuthApiService {
-        return AuthApiService(okHttpClient, networkUtils)
+    fun provideAuthApiService(okHttpClient: OkHttpClient, networkUtils: NetworkUtils, gson: Gson): AuthApiService {
+        return AuthApiService(okHttpClient, networkUtils, gson)
     }
     
     @Provides

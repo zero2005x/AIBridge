@@ -1,14 +1,18 @@
 package com.aibridge.chat.data.api
 
 import android.util.Log
+import com.aibridge.chat.config.ApiConfig
 import com.aibridge.chat.domain.model.LoginResult
 import com.aibridge.chat.domain.model.PortalCredentials
 import com.aibridge.chat.utils.NetworkUtils
+import com.aibridge.chat.utils.PortalEndpointDiscovery
+import com.aibridge.chat.utils.PortalListDiscovery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import com.google.gson.Gson
 import java.net.UnknownHostException
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -19,16 +23,17 @@ import javax.inject.Singleton
 @Singleton
 class AuthApiService @Inject constructor(
     private val httpClient: OkHttpClient,
-    private val networkUtils: NetworkUtils
+    private val networkUtils: NetworkUtils,
+    private val gson: Gson
 ) {
     companion object {
         private const val TAG = "AuthApiService"
-        private const val PORTAL_LOGIN_PATH = "/wise/wiseadm/s/subadmin/2595af81-c151-47eb-9f15-d17e0adbe3b4/login"
+        private const val FALLBACK_PORTAL_LOGIN_PATH = "/wise/wiseadm/s/subadmin/2595af81-c151-47eb-9f15-d17e0adbe3b4/login"
         private const val PORTAL_ACCESS_PATH = "/wise/wiseadm/s/promptportal/portal"
-        
-        // 常見的Portal ID列表，用於測試用戶權限
-        private val COMMON_PORTAL_IDS = listOf("1", "2", "3", "4", "5", "10", "11", "12", "13", "14", "15", "16", "20", "21", "100")
     }
+
+    private val endpointDiscovery = PortalEndpointDiscovery(httpClient)
+    private val portalListDiscovery = PortalListDiscovery(httpClient, gson)
 
     suspend fun checkLogin(
         username: String,
@@ -86,10 +91,31 @@ class AuthApiService @Inject constructor(
                 }
 
                 Log.d(TAG, "Network checks passed, proceeding with login")
+                
+                // Step 0: 動態發現端點（如果尚未發現）
+                Log.d(TAG, "Step 0: Discovering Portal endpoints")
+                val endpoints = endpointDiscovery.discoverPortalEndpoints(credentials.baseUrl)
+                if (endpoints.discoverySuccess && endpoints.loginPath != null) {
+                    Log.d(TAG, "Dynamic endpoints discovered successfully")
+                    Log.d(TAG, "Login Path: ${endpoints.loginPath}")
+                    Log.d(TAG, "Portal Path: ${endpoints.portalPath}")
+                    Log.d(TAG, "Chat Endpoint: ${endpoints.chatEndpoint}")
+                    Log.d(TAG, "Detected UUID: ${endpoints.detectedUuid}")
+                    
+                    // 更新 ApiConfig 的動態端點
+                    ApiConfig.setDynamicEndpoints(
+                        portalId = endpoints.detectedUuid,
+                        loginUrl = if (endpoints.loginPath != null) "${credentials.baseUrl}${endpoints.loginPath}" else null,
+                        completionUrl = if (endpoints.chatEndpoint != null) "${credentials.baseUrl}${endpoints.chatEndpoint}" else null
+                    )
+                } else {
+                    Log.w(TAG, "Failed to discover dynamic endpoints, using fallback")
+                }
+                
                 Log.d(TAG, "Step 1: Getting login page and initial cookies")
                 
-                // Step 1: 取得登入頁面和初始 cookies
-                val loginPageUrl = "${credentials.baseUrl}$PORTAL_LOGIN_PATH"
+                // Step 1: 取得登入頁面和初始 cookies（使用動態發現的或回退的URL）
+                val loginPageUrl = ApiConfig.getLoginUrl() ?: "${credentials.baseUrl}$FALLBACK_PORTAL_LOGIN_PATH"
                 Log.d(TAG, "Login page URL: $loginPageUrl")
                 
                 val loginPageResponse = httpClient.newCall(
@@ -215,60 +241,14 @@ class AuthApiService @Inject constructor(
     suspend fun checkAccess(sessionCookie: String, baseUrl: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "Checking portal access")
+                Log.d(TAG, "Checking portal access using simplified method")
                 
-                val accessUrl = "$baseUrl$PORTAL_ACCESS_PATH"
-                Log.d(TAG, "Portal access URL: $accessUrl")
+                // 使用新的Portal訪問測試方法
+                val hasAccess = portalListDiscovery.testPortalAccess(baseUrl, sessionCookie)
                 
-                val response = httpClient.newCall(
-                    Request.Builder()
-                        .url(accessUrl)
-                        .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
-                        .addHeader("Accept-Language", "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7")
-                        .addHeader("Cookie", sessionCookie)
-                        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
-                        .addHeader("Upgrade-Insecure-Requests", "1")
-                        .build()
-                ).execute()
-
-                Log.d(TAG, "Access check response: ${response.code}")
+                Log.d(TAG, "Portal access result: $hasAccess")
+                return@withContext hasAccess
                 
-                val hasAccess = response.isSuccessful && response.code != 302
-                
-                if (hasAccess) {
-                    // 檢查回應內容是否包含預期的 Portal 內容
-                    val responseBody = response.body?.string() ?: ""
-                    Log.d(TAG, "Portal access response body preview: ${responseBody.take(200)}")
-                    
-                    val containsPortalContent = responseBody.contains("portal") || 
-                                             responseBody.contains("promptportal") ||
-                                             responseBody.contains("Portal") ||
-                                             (!responseBody.contains("login") && responseBody.length > 100)
-                    
-                    Log.d(TAG, "Portal access granted: $containsPortalContent")
-                    Log.d(TAG, "Response contains 'portal': ${responseBody.contains("portal")}")
-                    Log.d(TAG, "Response contains 'promptportal': ${responseBody.contains("promptportal")}")
-                    Log.d(TAG, "Response contains 'Portal': ${responseBody.contains("Portal")}")
-                    Log.d(TAG, "Response does not contain 'login': ${!responseBody.contains("login")}")
-                    Log.d(TAG, "Response length: ${responseBody.length}")
-                    
-                    containsPortalContent
-                } else {
-                    Log.w(TAG, "Portal access denied: HTTP ${response.code}")
-                    false
-                }
-            } catch (e: UnknownHostException) {
-                Log.e(TAG, "DNS resolution failed during access check: ${e.message}")
-                false
-            } catch (e: SocketTimeoutException) {
-                Log.e(TAG, "Timeout during access check: ${e.message}")
-                false
-            } catch (e: ConnectException) {
-                Log.e(TAG, "Connection failed during access check: ${e.message}")
-                false
-            } catch (e: IOException) {
-                Log.e(TAG, "Network I/O error during access check: ${e.message}")
-                false
             } catch (e: Exception) {
                 Log.e(TAG, "Access check exception: ${e.message}", e)
                 false
@@ -317,211 +297,39 @@ class AuthApiService @Inject constructor(
     }
     
     /**
-     * 發現用戶可訪問的Portal ID
+     * 發現用戶可訪問的Portal ID（使用Portal列表API）
      */
     suspend fun discoverAvailablePortalIds(sessionCookie: String, baseUrl: String): List<String> {
         return withContext(Dispatchers.IO) {
-            val availablePortalIds = mutableListOf<String>()
-            
-            Log.d(TAG, "Discovering available Portal IDs for user")
+            Log.d(TAG, "Discovering available Portal IDs using Portal list API")
             Log.d(TAG, "Base URL: $baseUrl")
             Log.d(TAG, "Session Cookie: ${sessionCookie.take(50)}...")
             
-            // 先嘗試訪問Portal主頁，看是否有權限信息
             try {
-                val portalMainUrl = "$baseUrl/wise/wiseadm/s/promptportal/portal"
-                Log.d(TAG, "Accessing Portal main page: $portalMainUrl")
-                val mainPageResponse = httpClient.newCall(
-                    Request.Builder()
-                        .url(portalMainUrl)
-                        .addHeader("Cookie", sessionCookie)
-                        .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                        .build()
-                ).execute()
+                // 使用Portal列表發現服務
+                val discoveredPortals = portalListDiscovery.discoverPortals(baseUrl, sessionCookie)
                 
-                Log.d(TAG, "Portal main page response: ${mainPageResponse.code}")
-                if (mainPageResponse.isSuccessful) {
-                    val mainPageBody = mainPageResponse.body?.string() ?: ""
-                    Log.d(TAG, "Portal main page response length: ${mainPageBody.length}")
+                if (discoveredPortals.success && discoveredPortals.portals.isNotEmpty()) {
+                    val availablePortalIds = discoveredPortals.portals.map { it.id.toString() }
                     
-                    // 更全面的Portal ID模式匹配
-                    val patterns = listOf(
-                        Regex("""form\?id=(\d+)"""),  // 原有模式
-                        Regex("""/portal/form\?id=(\d+)"""),  // 完整路径模式
-                        Regex("""portal\.form\?id=(\d+)"""),  // JS模式
-                        Regex("""data-portal-id=["'](\d+)["']"""),  // HTML data属性
-                        Regex("""portalId["\s]*[:=]["\s]*(\d+)"""),  // JS变量
-                        Regex("""href=["'][^"']*portal[^"']*id=(\d+)["']""")  // 链接模式
-                    )
-                    
-                    for (pattern in patterns) {
-                        val matches = pattern.findAll(mainPageBody)
-                        matches.forEach { match ->
-                            val portalId = match.groupValues[1]
-                            if (portalId !in availablePortalIds) {
-                                availablePortalIds.add(portalId)
-                                Log.d(TAG, "Found Portal ID in main page: $portalId (pattern: ${pattern.pattern})")
-                            }
-                        }
+                    Log.i(TAG, "Discovery complete via Portal list API. Available Portal IDs: $availablePortalIds")
+                    discoveredPortals.portals.forEach { portal ->
+                        Log.d(TAG, "Portal ${portal.id}: ${portal.name} - ${portal.description}")
                     }
                     
-                    Log.d(TAG, "Portal IDs found in main page: $availablePortalIds")
-                    
-                    // 如果找到了Portal ID，直接測試這些ID的可用性
-                    if (availablePortalIds.isNotEmpty()) {
-                        Log.d(TAG, "Testing discovered Portal IDs for actual accessibility")
-                        val testedPortalIds = mutableListOf<String>()
-                        
-                        for (portalId in availablePortalIds.toList()) {
-                            if (testPortalIdAccess(portalId, baseUrl, sessionCookie)) {
-                                testedPortalIds.add(portalId)
-                                Log.d(TAG, "Confirmed accessible Portal ID: $portalId")
-                            } else {
-                                Log.d(TAG, "Portal ID $portalId is not accessible")
-                            }
-                        }
-                        
-                        if (testedPortalIds.isNotEmpty()) {
-                            return@withContext testedPortalIds
-                        }
-                    }
+                    return@withContext availablePortalIds
                 } else {
-                    Log.w(TAG, "Failed to access Portal main page: ${mainPageResponse.code}")
+                    Log.w(TAG, "Portal list discovery failed: ${discoveredPortals.message}")
+                    
+                    // 如果Portal列表API失敗，回退到簡單的存取檢查
+                    Log.d(TAG, "Falling back to access check only")
+                    return@withContext emptyList()
                 }
+                
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to access Portal main page: ${e.message}")
+                Log.e(TAG, "Error during Portal discovery: ${e.message}", e)
+                return@withContext emptyList()
             }
-            
-            // 如果沒有從主頁找到Portal ID，或者所有發現的ID都不可訪問，嘗試常見的ID
-            if (availablePortalIds.isEmpty()) {
-                Log.d(TAG, "No accessible Portal IDs found in main page, testing common IDs: $COMMON_PORTAL_IDS")
-                
-                for (portalId in COMMON_PORTAL_IDS) {
-                    if (testPortalIdAccess(portalId, baseUrl, sessionCookie)) {
-                        availablePortalIds.add(portalId)
-                        Log.d(TAG, "Found accessible Portal ID: $portalId")
-                        
-                        // 限制測試數量以避免過多請求
-                        if (availablePortalIds.size >= 3) {
-                            Log.d(TAG, "Found enough Portal IDs, stopping discovery")
-                            break
-                        }
-                    }
-                }
-            }
-            
-            // 如果仍然沒有找到可用的Portal ID，作為最後的努力，返回一個空列表
-            // 這將觸發AiChatApiService中的fallback邏輯
-            if (availablePortalIds.isEmpty()) {
-                Log.w(TAG, "No Portal IDs with POST permissions found")
-                Log.i(TAG, "Note: Portal IDs 1-13 appear to have GET access only (based on discovery logs)")
-                
-                // 不要在這裡添加只讀ID，讓上層服務決定如何處理
-            }
-            
-            Log.i(TAG, "Discovery complete. Available Portal IDs: $availablePortalIds")
-            availablePortalIds
-        }
-    }
-    
-    /**
-     * 測試特定Portal ID的訪問權限
-     * 返回true表示可以完全訪問（包括POST），false表示無法訪問或只有只讀權限
-     */
-    private suspend fun testPortalIdAccess(portalId: String, baseUrl: String, sessionCookie: String): Boolean {
-        return try {
-            val testUrl = "$baseUrl/wise/wiseadm/s/promptportal/portal/form?id=$portalId"
-            Log.d(TAG, "Testing Portal ID $portalId: $testUrl")
-            
-            // 首先使用 GET 請求檢查基本訪問權限
-            val getResponse = httpClient.newCall(
-                Request.Builder()
-                    .url(testUrl)
-                    .get()
-                    .addHeader("Cookie", sessionCookie)
-                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .build()
-            ).execute()
-            
-            Log.d(TAG, "Portal ID $portalId GET test response: ${getResponse.code}")
-            if (!getResponse.isSuccessful || getResponse.code == 403) {
-                Log.d(TAG, "Portal ID $portalId not accessible: ${getResponse.code}")
-                return false
-            }
-            
-            // 檢查回應內容，確保不是登入頁面
-            val getResponseBody = getResponse.body?.string() ?: ""
-            val isLoginPage = getResponseBody.contains("<title>智能客服 - 登入</title>") || 
-                            getResponseBody.contains("login-form") ||
-                            (getResponseBody.contains("loginName") && getResponseBody.contains("intumitPswd"))
-            
-            if (isLoginPage) {
-                Log.d(TAG, "Portal ID $portalId redirected to login page")
-                return false
-            }
-            
-            // 檢查是否包含 Portal 表單元素
-            val hasPortalForm = getResponseBody.contains("USERPROMPT") || 
-                              getResponseBody.contains("portal") ||
-                              getResponseBody.contains("form") ||
-                              getResponseBody.contains("submit")
-            
-            if (!hasPortalForm) {
-                Log.d(TAG, "Portal ID $portalId does not contain portal form elements")
-                return false
-            }
-            
-            // 進一步使用 POST 請求測試實際提交權限
-            Log.d(TAG, "Portal ID $portalId passed GET test, testing POST submission")
-            
-            val testFormBody = FormBody.Builder()
-                .add("USERPROMPT", "test")
-                .add("USERUPLOADFILE", "data:application/octet-stream;base64,")
-                .build()
-            
-            val postResponse = httpClient.newCall(
-                Request.Builder()
-                    .url(testUrl)
-                    .post(testFormBody)
-                    .addHeader("Cookie", sessionCookie)
-                    .addHeader("Content-Type", "application/x-www-form-urlencoded")
-                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .build()
-            ).execute()
-            
-            Log.d(TAG, "Portal ID $portalId POST test response: ${postResponse.code}")
-            
-            // 檢查POST響應
-            when (postResponse.code) {
-                200 -> {
-                    // 成功響應，檢查是否有實際內容
-                    val postResponseBody = postResponse.body?.string() ?: ""
-                    if (postResponseBody.isNotEmpty() && !postResponseBody.contains("403") && !postResponseBody.contains("Forbidden")) {
-                        Log.d(TAG, "Portal ID $portalId has full access (POST successful)")
-                        return true
-                    } else {
-                        Log.d(TAG, "Portal ID $portalId POST returned empty or error response")
-                        return false
-                    }
-                }
-                400 -> {
-                    // 400錯誤通常表示參數問題，但有權限，可以算作可訪問
-                    Log.d(TAG, "Portal ID $portalId has submit permission (400 - parameter error)")
-                    return true
-                }
-                403 -> {
-                    Log.d(TAG, "Portal ID $portalId has GET access but no POST permission")
-                    return false
-                }
-                else -> {
-                    Log.d(TAG, "Portal ID $portalId POST test failed: ${postResponse.code}")
-                    return false
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.w(TAG, "Error testing Portal ID $portalId: ${e.message}")
-            false
         }
     }
 }

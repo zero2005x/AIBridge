@@ -7,6 +7,13 @@ package com.aibridge.chat.config
 object ApiConfig {
     
     /**
+     * 動態端點配置
+     */
+    private var dynamicPortalId: String? = null
+    private var dynamicLoginUrl: String? = null
+    private var dynamicPortalCompletionUrl: String? = null
+    
+    /**
      * 運行模式配置
      */
     enum class RunMode {
@@ -67,9 +74,33 @@ object ApiConfig {
     const val DEFAULT_PORTAL_ID = "13"
     
     /**
-     * 獲取完整的聊天 API URL
+     * 設定動態端點資訊
      */
-    fun getChatApiUrl(): String = "$BACKEND_BASE_URL$CHAT_ENDPOINT"
+    fun setDynamicEndpoints(portalId: String?, loginUrl: String?, completionUrl: String?) {
+        dynamicPortalId = portalId
+        dynamicLoginUrl = loginUrl
+        dynamicPortalCompletionUrl = completionUrl
+    }
+    
+    /**
+     * 獲取當前Portal ID (優先使用動態發現的)
+     */
+    fun getCurrentPortalId(): String = dynamicPortalId ?: DEFAULT_PORTAL_ID
+    
+    /**
+     * 獲取登入URL (優先使用動態發現的)
+     */
+    fun getLoginUrl(): String? = dynamicLoginUrl
+    
+    /**
+     * 獲取Portal完成端點URL (優先使用動態發現的)
+     */
+    fun getPortalCompletionUrl(): String? = dynamicPortalCompletionUrl
+    
+    /**
+     * 獲取完整的聊天 API URL (優先使用動態發現的端點)
+     */
+    fun getChatApiUrl(): String = dynamicPortalCompletionUrl ?: "$BACKEND_BASE_URL$CHAT_ENDPOINT"
     
     /**
      * 獲取完整的登入檢查 API URL

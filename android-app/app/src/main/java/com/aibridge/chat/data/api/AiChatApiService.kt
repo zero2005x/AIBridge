@@ -53,18 +53,30 @@ class AiChatApiService @Inject constructor(
                 val requestedPortalId = portalConfig?.id ?: authRepository.getDefaultPortalId() ?: ApiConfig.DEFAULT_PORTAL_ID
                 val availablePortalIds = authRepository.getAvailablePortalIds()
                 
-                // 如果沒有可用的Portal ID，檢查是否應該回退到測試模式
+                // 如果沒有可用的Portal ID，提供更好的錯誤信息
                 val workingPortalIds = if (availablePortalIds.isEmpty()) {
-                    Log.w(TAG, "No Portal IDs with full access available")
+                    Log.w(TAG, "No Portal IDs available from discovery")
                     
-                    // 嘗試使用只讀Portal ID列表，但警告用戶可能遇到權限問題
-                    val readOnlyIds = listOf("1", "2", "3", "4", "5", "10", "11", "12", "13")
-                    Log.w(TAG, "Falling back to read-only Portal IDs: $readOnlyIds")
-                    Log.w(TAG, "Note: These Portal IDs may only have GET access, POST requests might fail with 403")
-                    
-                    readOnlyIds
+                    // 返回空列表，這將觸發更好的錯誤處理
+                    emptyList()
                 } else {
                     availablePortalIds
+                }
+                
+                // 檢查是否有可用的Portal ID
+                if (workingPortalIds.isEmpty()) {
+                    Log.w(TAG, "No Portal IDs available for user")
+                    return@withContext ChatResponse(
+                        success = false,
+                        message = "❌ 無可用Portal\n\n" +
+                                 "未發現任何可用的Portal配置。\n\n" +
+                                 "可能原因：\n" +
+                                 "• 用戶賬號無Portal存取權限\n" +
+                                 "• Portal服務暫時無法使用\n" +
+                                 "• 需要系統管理員配置Portal權限\n\n" +
+                                 "💡 請聯繫系統管理員檢查Portal配置。",
+                        errorDetails = "NO_PORTALS_AVAILABLE"
+                    )
                 }
                 
                 // 驗證請求的 Portal ID 是否在工作列表中
